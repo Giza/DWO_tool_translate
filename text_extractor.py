@@ -13,13 +13,71 @@ def extract_texts(string_path):
     all_texts = {}
     
     # Информация о структуре файлов
-    FILES = {
-        0: {"entry_size": 0x0C, "text_offset": 0x0, "text_offset_2": 0x04, "Unknown": 0x08},
-        #17: {"entry_size": 0x14, "text_offset": 0x0, "speaker_offset": 0xC},
-        #30: {"entry_size": 0x8, "text_offset": 0x0},
-        #31: {"entry_size": 0x4, "text_offset": 0x0},
-        #32: {"entry_size": 0x4, "text_offset": 0x0},
+    FILE_STRUCTURES = {
+        "double_text": {
+            "files": [0, 1, 3, 4, 8, 102, ],
+            "entry_size": 0x0C,
+            "text_offset": 0x0,
+            "text_offset_2": 0x04,
+            "Unknown": 0x08
+        },
+        "single_text_zero": {
+            "files": [2, 9, 10, 100, 103, 104, 105, 108, 12,],
+            "entry_size": 0x08,
+            "text_offset": 0x0,
+            "Unknown": 0x4
+        },
+        "single_text_4bytes": {
+            "files": [5],
+            "entry_size": 0x04,
+            "text_offset": 0x0
+        },
+        "single_text_12bytes": {
+            "files": [101, 13, 14, 15, 16, ],
+            "entry_size": 0x0C,
+            "text_offset": 0x0,
+            "Unknown": 0x04,
+            "Unknown_2": 0x08
+        },
+        "single_text_28bytes": {
+            "files": [18],
+            "entry_size": 0x1C,
+            "text_offset": 0x0,
+            "Unknown": 0x04,
+            "Unknown_2": 0x08,
+            "Unknown_3": 0x0C,
+            "Unknown_4": 0x10,
+            "Unknown_5": 0x14,
+            "Unknown_6": 0x18
+        },
+        "triple_text": {
+            "files": [107],
+            "entry_size": 0x10,
+            "text_offset": 0x0,
+            "text_offset_2": 0x04,
+            "text_offset_3": 0x08,
+            "Unknown": 0x0C
+        },
+        "speaker_text": {
+            "files": [17],
+            "entry_size": 0x14,
+            "text_offset": 0x0,
+            "Unknown": 0x04,
+            "Unknown_2": 0x08,
+            "speaker_offset": 0xC
+        },
+        #"simple_text": {
+        #    "files": [30, 31, 32],
+        #    "entry_size": 0x8,
+        #    "text_offset": 0x0
+        #}
     }
+
+    # Создаем словарь FILES для обратной совместимости
+    FILES = {}
+    for structure in FILE_STRUCTURES.values():
+        for file_id in structure["files"]:
+            FILES[file_id] = {k: v for k, v in structure.items() if k != "files"}
 
     # Обработка каждого файла
     for file_idx in FILES.keys():
@@ -40,26 +98,79 @@ def extract_texts(string_path):
             string_offset_pos = entry_pos + FILES[file_idx]["text_offset"]
             string_offset = struct.unpack_from("<I", fd, string_offset_pos)[0]
 
-            if file_idx == 17:
-                speaker_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["speaker_offset"])[0]
-                text = {
-                    "speaker_id": speaker_id,
-                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
-                }
-            elif file_idx == 0:
+            if file_idx in FILE_STRUCTURES["double_text"]["files"]:
                 string_offset_2_pos = entry_pos + FILES[file_idx]["text_offset_2"]
                 string_offset_2 = struct.unpack_from("<I", fd, string_offset_2_pos)[0]
-                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
 
                 text = {
                     "Unknown": Unknown_id,
                     "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8"),
                     "text_2": fd[string_offset_2_pos + string_offset_2 : fd.find(b"\x00", string_offset_2_pos + string_offset_2)].decode("utf8")
                 }
-            else:
+            elif file_idx in FILE_STRUCTURES["single_text_zero"]["files"]:
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
+
+                text = {
+                    "Unknown": Unknown_id,
+                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
+                }
+            elif file_idx in FILE_STRUCTURES["single_text_4bytes"]["files"]:
+
                 text = {
                     "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
                 }
+            elif file_idx in FILE_STRUCTURES["single_text_12bytes"]["files"]:
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
+                Unknown_2_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_2"])[0]
+
+                text = {
+                    "Unknown": Unknown_id,
+                    "Unknown_2": Unknown_2_id,
+                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
+                }
+            elif file_idx in FILE_STRUCTURES["triple_text"]["files"]:
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
+                string_offset_2_pos = entry_pos + FILES[file_idx]["text_offset_2"]
+                string_offset_2 = struct.unpack_from("<I", fd, string_offset_2_pos)[0]
+                string_offset_3_pos = entry_pos + FILES[file_idx]["text_offset_3"]
+                string_offset_3 = struct.unpack_from("<I", fd, string_offset_3_pos)[0]
+                text = {
+                    "Unknown": Unknown_id,
+                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8"),
+                    "text_2": fd[string_offset_2_pos + string_offset_2 : fd.find(b"\x00", string_offset_2_pos + string_offset_2)].decode("utf8"),
+                    "text_3": fd[string_offset_3_pos + string_offset_3 : fd.find(b"\x00", string_offset_3_pos + string_offset_3)].decode("utf8")
+                }
+
+            elif file_idx in FILE_STRUCTURES["speaker_text"]["files"]:
+                speaker_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["speaker_offset"])[0]
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
+                Unknown_2_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_2"])[0]
+                text = {
+                    "Unknown": Unknown_id,
+                    "Unknown_2": Unknown_2_id,
+                    "speaker_id": speaker_id,
+                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
+                }
+            elif file_idx in FILE_STRUCTURES["single_text_28bytes"]["files"]:
+                Unknown_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown"])[0]
+                Unknown_2_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_2"])[0]
+                Unknown_3_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_3"])[0]
+                Unknown_4_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_4"])[0]
+                Unknown_5_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_5"])[0]
+                Unknown_6_id = struct.unpack_from("<I", fd, entry_pos + FILES[file_idx]["Unknown_6"])[0]
+                text = {
+                    "Unknown": Unknown_id,
+                    "Unknown_2": Unknown_2_id,
+                    "Unknown_3": Unknown_3_id,
+                    "Unknown_4": Unknown_4_id,
+                    "Unknown_5": Unknown_5_id,
+                    "Unknown_6": Unknown_6_id,
+                    "text": fd[string_offset_pos + string_offset : fd.find(b"\x00", string_offset_pos + string_offset)].decode("utf8")
+                }
+
+
+
             
             file_texts.append(text)
         
@@ -85,13 +196,38 @@ def pack_texts(string_path, json_file="extracted_texts.json"):
         texts = json.load(f)
 
     # Информация о структуре файлов
-    FILES = {
-        0: {"entry_size": 0x0C, "text_offset": 0x0, "text_offset_2": 0x4, "Unknown": 0x8},
-        #17: {"entry_size": 0x14, "text_offset": 0x0, "speaker_offset": 0xC},
-        #30: {"entry_size": 0x8, "text_offset": 0x0},
-        #31: {"entry_size": 0x4, "text_offset": 0x0},
-        #32: {"entry_size": 0x4, "text_offset": 0x0},
+    FILE_STRUCTURES = {
+        "double_text": {
+            "files": [0, 1, 3],
+            "entry_size": 0x0C,
+            "text_offset": 0x0,
+            "text_offset_2": 0x04,
+            "Unknown": 0x08
+        },
+        "single_text_zero": {
+            "files": [2],
+            "entry_size": 0x08,
+            "text_offset": 0x0,
+            "zero": 0x4
+        },
+        #"speaker_text": {
+        #    "files": [17],
+        #    "entry_size": 0x14,
+        #    "text_offset": 0x0,
+        #    "speaker_offset": 0xC
+        #},
+        #"simple_text": {
+        #    "files": [30, 31, 32],
+        #    "entry_size": 0x8,
+        #    "text_offset": 0x0
+        #}
     }
+
+    # Создаем словарь FILES для обратной совместимости
+    FILES = {}
+    for structure in FILE_STRUCTURES.values():
+        for file_id in structure["files"]:
+            FILES[file_id] = {k: v for k, v in structure.items() if k != "files"}
 
     # Создание бэкапов и обработка каждого файла
     for file_idx_str, file_texts in texts.items():
@@ -137,12 +273,13 @@ def pack_texts(string_path, json_file="extracted_texts.json"):
         for i, text_entry in enumerate(file_texts):
             entry_pos = header_size + i * FILES[file_idx]["entry_size"]
             
-            if file_idx == 0:
+            if file_idx in FILE_STRUCTURES["double_text"]["files"]:
                 # Обработка первой строки
                 string_offset_pos = entry_pos + FILES[file_idx]["text_offset"]
                 text = text_entry["text"]
                 text_bytes = text.encode("utf8") + b"\x00"
                 relative_offset = current_pos - string_offset_pos
+
                 struct.pack_into("<I", new_data, string_offset_pos, relative_offset)
                 new_data.extend(text_bytes)
                 current_pos += len(text_bytes)
@@ -160,18 +297,7 @@ def pack_texts(string_path, json_file="extracted_texts.json"):
                 unknown_pos = entry_pos + FILES[file_idx]["Unknown"]
                 struct.pack_into("<I", new_data, unknown_pos, text_entry["Unknown"][0])
 
-            elif file_idx == 17 and "speaker_id" in text_entry:
-                string_offset_pos = entry_pos + FILES[file_idx]["text_offset"]
-                text = text_entry["text"]
-                text_bytes = text.encode("utf8") + b"\x00"
-                relative_offset = current_pos - string_offset_pos
-                struct.pack_into("<I", new_data, string_offset_pos, relative_offset)
-                speaker_offset_pos = entry_pos + FILES[file_idx]["speaker_offset"]
-                struct.pack_into("<I", new_data, speaker_offset_pos, text_entry["speaker_id"])
-                new_data.extend(text_bytes)
-                current_pos += len(text_bytes)
-
-            else:
+            elif file_idx in FILE_STRUCTURES["single_text_zero"]["files"]:
                 string_offset_pos = entry_pos + FILES[file_idx]["text_offset"]
                 text = text_entry["text"]
                 text_bytes = text.encode("utf8") + b"\x00"
